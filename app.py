@@ -1,6 +1,22 @@
 import json
 import os
 from flask import Flask, render_template, request, redirect, url_for, flash
+from flask_wtf import FlaskForm
+from wtforms import StringField
+from wtforms.validators import DataRequired
+
+
+class AddCourseForm(FlaskForm):
+    code = StringField('code', validators=[DataRequired()], default='')
+    name = StringField('name', validators=[DataRequired()], default='')
+    instructor = StringField('instructor', validators=[DataRequired()], default='')
+    semester = StringField('semester', validators=[DataRequired()], default='')
+    schedule = StringField('schedule', validators=[DataRequired()], default='')
+    classroom = StringField('classroom', validators=[DataRequired()], default='')
+    prerequisites = StringField('prerequisites', validators=[DataRequired()], default='')
+    grading = StringField('grading', validators=[DataRequired()], default='')
+    description = StringField('description', validators=[DataRequired()], default='')
+
 
 # Flask App Initialization
 app = Flask(__name__)
@@ -45,9 +61,18 @@ def course_details(code):
         return redirect(url_for('course_catalog'))
     return render_template('course_details.html', course=course)
 
-@app.route('/add_course')
+
+@app.route('/add_course', methods=['GET', 'POST'])
 def add_course():
-    return render_template('add_course.html')
+    form = AddCourseForm()
+
+    if form.validate_on_submit():
+        return redirect('/success')
+
+    print(form.errors)
+
+    return render_template('add_course.html', form=form)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
