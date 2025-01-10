@@ -45,7 +45,9 @@ def course_details(code):
         return redirect(url_for('course_catalog'))
     return render_template('course_details.html', course=course)
 
-
+@app.route('/add_course')
+def add_course():
+    return render_template('add_course.html')
 
 if __name__ == '__main__':
     app.run(debug=True)
