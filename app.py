@@ -15,7 +15,7 @@ class AddCourseForm(FlaskForm):
     classroom = StringField('classroom', validators=[DataRequired()], default='')
     prerequisites = StringField('prerequisites', validators=[DataRequired()], default='')
     grading = StringField('grading', validators=[DataRequired()], default='')
-    description = StringField('description', validators=[DataRequired()], default='')
+    description = StringField('description', default='')
 
 
 # Flask App Initialization
@@ -67,9 +67,20 @@ def add_course():
     form = AddCourseForm()
 
     if form.validate_on_submit():
-        return redirect('/success')
+        print(form.data)
+        new_course = form.data.copy()
+        new_course.pop('csrf_token')
 
-    print(form.errors)
+        with open("course_catalog.json", "r") as json_file:
+            file_data = json.loads(json_file.read())
+
+        file_data.append(new_course)
+        print(file_data)
+
+        with open("course_catalog.json", "w") as json_file:
+            json_file.write(json.dumps(file_data, indent=4))
+
+        return redirect('/success')
 
     return render_template('add_course.html', form=form)
 
