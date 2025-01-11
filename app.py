@@ -4,7 +4,9 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_wtf import FlaskForm
 from wtforms import StringField
 from wtforms.validators import DataRequired
+import logging
 
+logging.basicConfig(level=logging.DEBUG)
 
 class AddCourseForm(FlaskForm):
     code = StringField('code', validators=[DataRequired()], default='')
@@ -22,7 +24,7 @@ class AddCourseForm(FlaskForm):
 app = Flask(__name__)
 app.secret_key = 'secret'
 COURSE_FILE = 'course_catalog.json'
-
+required_fields = ["code", "name", "instructor", "semester", "schedule", "classroom", "prerequisites", "grading"]
 
 # Utility Functions
 def load_courses():
@@ -65,24 +67,44 @@ def course_details(code):
 @app.route('/add_course', methods=['GET', 'POST'])
 def add_course():
     form = AddCourseForm()
+    # print(form.data)
+
+    if request.method == 'GET':
+        return render_template('add_course.html', form=form)
+
+    new_course = form.data.copy()
+    new_course.pop('csrf_token')
 
     if form.validate_on_submit():
-        print(form.data)
-        new_course = form.data.copy()
-        new_course.pop('csrf_token')
 
-        with open("course_catalog.json", "r") as json_file:
-            file_data = json.loads(json_file.read())
+        try:
+            with open("course_catalog.json", "r") as json_file:
+                file_data = json.loads(json_file.read())
+        except Exception as e:
+            logging.error(f'Error {e} when reading the JSON file.')
+            return redirect('/catalog')
 
         file_data.append(new_course)
-        print(file_data)
+        logging.info(f'Course {new_course['code']} added successfully. All required fields are present.')
 
-        with open("course_catalog.json", "w") as json_file:
-            json_file.write(json.dumps(file_data, indent=4))
+        try:
+            with open("course_catalog.json", "w") as json_file:
+                json_file.write(json.dumps(file_data, indent=4))
+        except Exception as e:
+            logging.error(f'Error {e} when updating the JSON file.')
+        
+        return redirect('/catalog')
+    
+    else:
+        print(new_course)
+        missing = []
+        for field in required_fields:
+            if len(new_course[field]) == 0:
+                missing.append(field)
+        # print(new_course)
+        logging.error(f"Failed to add courses due to missing fields: {', '.join([str(s) for s in missing])}")
 
-        return redirect('/success')
-
-    return render_template('add_course.html', form=form)
+        return render_template('add_course.html', form=form)
 
 
 if __name__ == '__main__':

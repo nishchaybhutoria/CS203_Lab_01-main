@@ -20,5 +20,16 @@
         "prerequisites": "Basic Python, Linux",
         "grading": "50% Assignment, 50% Quiz",
         "description": ""
+    },
+    {
+        "code": "ES 301",
+        "name": "Data Structures and Algorithms II",
+        "instructor": "Manoj Gupta",
+        "semester": "Fall 2025",
+        "schedule": "Crazy",
+        "classroom": "10/201",
+        "prerequisites": "Easy",
+        "grading": "All A+",
+        "description": "Filler description."
     }
 ]
