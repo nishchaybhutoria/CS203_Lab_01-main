@@ -69,12 +69,14 @@ def add_course():
     form = AddCourseForm()
     # print(form.data)
 
+    # trigger form submission for POST request only
     if request.method == 'GET':
         return render_template('add_course.html', form=form)
 
     new_course = form.data.copy()
     new_course.pop('csrf_token')
 
+    # validate if all required fields are present
     if form.validate_on_submit():
 
         try:
@@ -95,6 +97,7 @@ def add_course():
         
         return redirect('/catalog')
     
+    # log an error with the missing fields if the form is invalid and pre-fill the form with the old data
     else:
         print(new_course)
         missing = []
