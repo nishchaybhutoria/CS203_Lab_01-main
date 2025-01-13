@@ -12,14 +12,29 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import Status, StatusCode
 from opentelemetry.exporter.jaeger.thrift import JaegerExporter
 from opentelemetry.sdk.resources import Resource
+from pythonjsonlogger import jsonlogger
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
+# add metrics TBD
 
 course_add_logger = logging.getLogger('AddCourseLogger')
+werkzeug_logger = logging.getLogger('werkzeug')
+
+for handler in werkzeug_logger.handlers[:]:
+    werkzeug_logger.removeHandler(handler)
+
+handler = logging.StreamHandler()
+formatter = jsonlogger.JsonFormatter(
+    '%(asctime)s %(name)s %(levelname)s %(message)s'
+)
+
+handler.setFormatter(formatter)
+course_add_logger.addHandler(handler)
+werkzeug_logger.addHandler(handler)
+
+course_add_logger.setLevel(logging.DEBUG)
+werkzeug_logger.setLevel(logging.DEBUG)
+
+werkzeug_logger.propagate = False
 
 class AddCourseForm(FlaskForm):
     code = StringField('code', validators=[DataRequired()], default='')
@@ -151,7 +166,7 @@ def add_course():
         
         # log an error with the missing fields if the form is invalid and pre-fill the form with the old data
         else:
-            print(new_course)
+            # print(new_course)
             missing = [field for field in required_fields if not new_course.get(field)]
             course_add_logger.error(
                 f"Failed to add course. Missing fields: {', '.join(missing)}"
