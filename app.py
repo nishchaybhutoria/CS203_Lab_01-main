@@ -11,6 +11,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import Status, StatusCode
 from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+from opentelemetry.sdk.resources import Resource
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -42,7 +43,11 @@ required_fields = ["code", "name", "instructor", "semester", "schedule", "classr
 FlaskInstrumentor().instrument_app(app)
 
 # Configure OpenTelemetry
-trace.set_tracer_provider(TracerProvider())
+trace.set_tracer_provider(
+    TracerProvider(
+        resource=Resource.create({"service.name": "catalog-app"}) # create service name for this app
+    )
+)
 jaeger_exporter = JaegerExporter(agent_host_name="localhost", agent_port=6831)
 span_processor = BatchSpanProcessor(jaeger_exporter)
 trace.get_tracer_provider().add_span_processor(span_processor)
