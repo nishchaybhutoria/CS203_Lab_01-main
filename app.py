@@ -157,9 +157,10 @@ def add_course():
                 f"Failed to add course. Missing fields: {', '.join(missing)}"
             )
 
-            with tracer.start_as_current_span("add_course_form_validation_error") as span:
-                span.set_status(Status(StatusCode.ERROR, description="Validation error: Missing required fields"))
-                span.set_attribute("missing_fields", ", ".join(missing))
+            with tracer.start_as_current_span("add_course_form_validation_error",
+                context=trace.set_span_in_context(span)) as child_span:
+                child_span.set_status(Status(StatusCode.ERROR, description="Validation error: Missing required fields"))
+                child_span.set_attribute("missing_fields", ", ".join(missing))
 
             return render_template('add_course.html', form=form)
 
