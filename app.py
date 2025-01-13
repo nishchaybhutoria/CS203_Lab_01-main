@@ -1,5 +1,7 @@
 import json
 import os
+from getopt import error
+
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_wtf import FlaskForm
 from wtforms import StringField
@@ -13,8 +15,10 @@ from opentelemetry.trace import Status, StatusCode
 from opentelemetry.exporter.jaeger.thrift import JaegerExporter
 from opentelemetry.sdk.resources import Resource
 from pythonjsonlogger import jsonlogger
+from collections import defaultdict
 
-# add metrics TBD
+request_counts = defaultdict(int)
+error_counts = defaultdict(int)
 
 course_add_logger = logging.getLogger('AddCourseLogger')
 werkzeug_logger = logging.getLogger('werkzeug')
@@ -35,6 +39,7 @@ course_add_logger.setLevel(logging.DEBUG)
 werkzeug_logger.setLevel(logging.DEBUG)
 
 werkzeug_logger.propagate = False
+
 
 class AddCourseForm(FlaskForm):
     code = StringField('code', validators=[DataRequired()], default='')
@@ -60,12 +65,13 @@ FlaskInstrumentor().instrument_app(app)
 # Configure OpenTelemetry
 trace.set_tracer_provider(
     TracerProvider(
-        resource=Resource.create({"service.name": "catalog-app"}) # create service name for this app
+        resource=Resource.create({"service.name": "catalog-app"})  # create service name for this app
     )
 )
 jaeger_exporter = JaegerExporter(agent_host_name="localhost", agent_port=6831)
 span_processor = BatchSpanProcessor(jaeger_exporter)
 trace.get_tracer_provider().add_span_processor(span_processor)
+
 
 # Utility Functions
 def load_courses():
@@ -84,10 +90,21 @@ def save_courses(data):
         json.dump(courses, file, indent=4)
 
 
-# Routes
+@app.before_request
+def count_requests():
+    """Track total requests to each route."""
+    tracer = trace.get_tracer(__name__)
+    with tracer.start_as_current_span("count_requests") as span:
+        endpoint = request.base_url or "unknown"
+        request_counts[endpoint] += 1
+        span.set_attribute("total_requests", request_counts[endpoint])
+        course_add_logger.info(f"Total requests to {endpoint}: {request_counts[endpoint]}")
+
+
 @app.route('/')
 def index():
     return render_template('index.html')
+
 
 @app.route('/catalog')
 def course_catalog():
@@ -151,31 +168,50 @@ def add_course():
             span.set_attribute("course_code", new_course.get("code"))
             span.set_attribute("course_name", new_course.get("name"))
 
-            course_add_logger.info(f'Course {new_course['code']} added successfully. All required fields are present.')
+            course_add_logger.info(
+                f'Course {new_course['code']} added successfully. All required fields are present.'
+            )
 
             try:
                 with open("course_catalog.json", "w") as json_file:
                     json_file.write(json.dumps(file_data, indent=4))
-                span.set_status(trace.Status(trace.StatusCode.OK, description="JSON file updated successfully."))
+
+                span.set_status(trace.Status(trace.StatusCode.OK))
+
             except Exception as e:
-                course_add_logger.error(f'Error {e} when updating the JSON file.')
+                error_counts['server'] += 1
+
+                course_add_logger.error(f'Error {e} when updating the JSON file')
                 span.record_exception(e)
                 span.set_status(trace.Status(trace.StatusCode.ERROR, description="Error updating JSON file."))
 
+                # export the number of errors
+                with tracer.start_as_current_span("count_errors",
+                                                  context=trace.set_span_in_context(span)) as child_span:
+                    child_span.set_status(Status(StatusCode.ERROR, description="New server side error"))
+                    child_span.set_attribute("client_error_count", error_counts['client'])
+                    child_span.set_attribute("server_error_count", error_counts['server'])
+
             return redirect('/catalog')
-        
+
         # log an error with the missing fields if the form is invalid and pre-fill the form with the old data
         else:
             # print(new_course)
             missing = [field for field in required_fields if not new_course.get(field)]
-            course_add_logger.error(
-                f"Failed to add course. Missing fields: {', '.join(missing)}"
-            )
+            error_counts['client'] += 1
+            course_add_logger.error(f"Failed to add course. Missing fields: {', '.join(missing)}")
 
             with tracer.start_as_current_span("add_course_form_validation_error",
-                context=trace.set_span_in_context(span)) as child_span:
+                                              context=trace.set_span_in_context(span)) as child_span:
                 child_span.set_status(Status(StatusCode.ERROR, description="Validation error: Missing required fields"))
                 child_span.set_attribute("missing_fields", ", ".join(missing))
+
+            # export the number of errors
+            with tracer.start_as_current_span("count_errors",
+                                              context=trace.set_span_in_context(span)) as child_span:
+                child_span.set_status(Status(StatusCode.ERROR, description="New client side error"))
+                child_span.set_attribute("client_error_count", error_counts['client'])
+                child_span.set_attribute("server_error_count", error_counts['server'])
 
             return render_template('add_course.html', form=form)
 
