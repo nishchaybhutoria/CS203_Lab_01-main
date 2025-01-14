@@ -24,6 +24,11 @@ This lab submission demonstrates the use of distributed tracing and telemetry in
 ## **Features**
 ### **1. Add Courses to the Catalog**
 - An "Add a New Course" button on the catalog page navigates to a form for adding courses.
+
+  ![Add Course Button](images/add.png)
+
+  ![Form](images/form.png)
+
 - Logs are generated for:
   - **Successful course additions** (`INFO` level).
   - **Missing required fields** (`ERROR` level).
@@ -36,6 +41,9 @@ This lab submission demonstrates the use of distributed tracing and telemetry in
     "message": "Course CS 201 added successfully. All required fields are present."
   }
   ```
+- Console logs:
+
+  ![Logs](images/logs.png)
 
 ---
 
